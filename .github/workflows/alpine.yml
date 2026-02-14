@@ -21,7 +21,7 @@ jobs:
       - name: Install XFCE4, VNC, and essentials
         run: |
           docker exec alpine-gui sh -c "
-            apk update && apk add --no-cache xfce4 xfce4-terminal dbus-x11 x11vnc xvfb sudo bash nano wget
+            apk update && apk add --no-cache xfce4 xfce4-terminal dbus-x11 x11vnc xvfb sudo bash nano wget unzip
           "
 
       - name: Add user
@@ -54,12 +54,17 @@ jobs:
             mv ngrok /usr/local/bin/
           "
 
-      - name: Start Ngrok tunnel
+      - name: Start Ngrok tunnel and print URL
         run: |
           docker exec -d alpine-gui sh -c "
             ngrok authtoken ${{ github.event.inputs.ngrok_token }}
-            ngrok tcp 5900 --region=us &
+            ngrok tcp 5900 --region=us --log=stdout > /tmp/ngrok.log &
           "
+          # Wait for Ngrok to start
+          sleep 10
+          # Extract public TCP URL
+          NGROK_URL=$(docker exec alpine-gui sh -c "grep -o 'tcp://[0-9a-zA-Z:.]*' /tmp/ngrok.log | head -1")
+          echo "✅ Connect to your VNC here: $NGROK_URL (password: 123456)"
 
       - name: Install VS Code & misc packages
         run: |
