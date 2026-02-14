@@ -1,4 +1,4 @@
-name: Alpine-XFCE-VNC
+name: Alpine-XFCE-RDP
 on:
   workflow_dispatch:
     inputs:
@@ -18,10 +18,10 @@ jobs:
           docker pull alpine:latest
           docker run -d --name alpine-gui --privileged --shm-size=2g -v /tmp/.X11-unix:/tmp/.X11-unix alpine:latest tail -f /dev/null
 
-      - name: Install XFCE4, VNC, and essentials
+      - name: Install XFCE4, xrdp, and essentials
         run: |
           docker exec alpine-gui sh -c "
-            apk update && apk add --no-cache xfce4 xfce4-terminal dbus-x11 x11vnc xvfb sudo bash nano wget unzip
+            apk update && apk add --no-cache xfce4 xfce4-terminal dbus-x11 xrdp sudo bash nano wget unzip
           "
 
       - name: Add user
@@ -30,20 +30,19 @@ jobs:
             adduser -D user && echo 'user:preetygoodpassword' | chpasswd && addgroup user wheel
           "
 
-      - name: Configure VNC
+      - name: Configure XFCE for RDP
         run: |
           docker exec alpine-gui sh -c "
-            mkdir -p /home/user/.vnc
-            x11vnc -storepasswd 123456 /home/user/.vnc/passwd
+            mkdir -p /home/user/.xsession
+            echo 'xfce4-session' > /home/user/.xsession
+            chown user:user /home/user/.xsession
           "
 
-      - name: Start XFCE + VNC server
+      - name: Start xrdp server
         run: |
           docker exec -d alpine-gui sh -c "
-            Xvfb :1 -screen 0 1024x768x16 &
-            export DISPLAY=:1
-            xfce4-session &
-            x11vnc -display :1 -forever -usepw -shared &
+            /usr/sbin/xrdp-sesman &
+            /usr/sbin/xrdp -nodaemon &
           "
 
       - name: Install Ngrok v3
@@ -54,19 +53,16 @@ jobs:
             mv ngrok /usr/local/bin/
           "
 
-      - name: Start Ngrok tunnel and show full output
+      - name: Start Ngrok tunnel and print output
         run: |
           docker exec -d alpine-gui sh -c "
             ngrok authtoken ${{ github.event.inputs.ngrok_token }}
-            ngrok tcp 5900 --region=us --log=stdout > /tmp/ngrok.log &
+            ngrok tcp 3389 --region=us --log=stdout > /tmp/ngrok.log &
           "
           sleep 5
           echo "🟢 Ngrok output:"
           docker exec alpine-gui sh -c "cat /tmp/ngrok.log"
 
-      - name: Run your custom script
+      - name: Keep session alive
         run: |
-          docker exec alpine-gui sh -c "
-            wget https://raw.githubusercontent.com/Mrbokri/ubuntu-hehe/main/hehe.sh
-            bash hehe.sh
-          "
+          docker exec -d alpine-gui sh -c "while true; do sleep 60; done"
