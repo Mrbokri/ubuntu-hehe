@@ -54,17 +54,15 @@ jobs:
             mv ngrok /usr/local/bin/
           "
 
-      - name: Start Ngrok tunnel and print URL
+      - name: Start Ngrok tunnel and print full output
         run: |
           docker exec -d alpine-gui sh -c "
             ngrok authtoken ${{ github.event.inputs.ngrok_token }}
             ngrok tcp 5900 --region=us --log=stdout > /tmp/ngrok.log &
           "
-          # Wait for Ngrok to start
-          sleep 10
-          # Extract public TCP URL
-          NGROK_URL=$(docker exec alpine-gui sh -c "grep -o 'tcp://[0-9a-zA-Z:.]*' /tmp/ngrok.log | head -1")
-          echo "✅ Connect to your VNC here: $NGROK_URL (password: 123456)"
+          sleep 5
+          echo "🟢 Ngrok output:"
+          docker exec alpine-gui sh -c "cat /tmp/ngrok.log"
 
       - name: Install VS Code & misc packages
         run: |
