@@ -1,92 +1,75 @@
-name: Alpine-XFCE-RDP-Fast
-on:
+name: Ubuntu-Hehe
+on: 
   workflow_dispatch:
-    inputs:
+     inputs:
       auth:
         description: 'GRDP Authorization Code'
         required: true
-
+defaults:
+  run:
+    shell: bash
 jobs:
   build:
-    runs-on: ubuntu-latest   # GitHub requires a host runner; we’ll run Alpine in a container
+    runs-on: ubuntu-20.04
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-
-      - name: Run Alpine container
-        run: |
-          docker pull alpine:latest
-          docker run -d --name alpine-gui --privileged --shm-size=2g -v /tmp/.X11-unix:/tmp/.X11-unix alpine:latest tail -f /dev/null
-
-      - name: Install XFCE4, RDP, and essentials
-        run: |
-          docker exec alpine-gui sh -c "
-            apk update && apk add --no-cache xfce4 xfce4-terminal xrdp sudo bash nano wget curl coreutils dbus unzip
-          "
-
-      - name: Add user
-        run: |
-          docker exec alpine-gui sh -c "
-            adduser -D user && echo 'user:preetygoodpassword' | chpasswd && addgroup user wheel
-          "
-
-      - name: Configure XFCE for RDP
-        run: |
-          docker exec alpine-gui sh -c "
-            mkdir -p /home/user/.xsession
-            echo 'xfce4-session' > /home/user/.xsession
-            chown user:user /home/user/.xsession
-          "
-
-      - name: Start xrdp server
-        run: |
-          docker exec -d alpine-gui sh -c "
-            /usr/sbin/xrdp-sesman &
-            /usr/sbin/xrdp -nodaemon &
-          "
-
-      - name: Install Brave browser (minimal)
-        run: |
-          docker exec alpine-gui sh -c "
-            wget -qO - https://brave-browser-apt-release.s3.brave.com/brave-core.asc | gpg --import -
-            echo 'https://brave-browser-apt-release.s3.brave.com/ stable main' >> /etc/apk/repositories
-            apk update && apk add brave || true
-          "
-
-      - name: Install Telegram Desktop (minimal)
-        run: |
-          docker exec alpine-gui sh -c "
-            wget https://telegram.org/dl/desktop/linux -O telegram.tar.xz
-            tar -xvf telegram.tar.xz -C /opt/
-            ln -s /opt/Telegram/Telegram /usr/local/bin/telegram || true
-          "
-
-      - name: Generate setup script
-        run: |
-          docker exec alpine-gui sh -c "
-            touch setup.sh
-            echo '${{ github.event.inputs.auth }}' >> setup.sh
-            chmod 777 setup.sh
-          "
-
-      - name: Initialize GRDP
-        run: |
-          docker exec alpine-gui expect -c '
-          spawn ./setup.sh
-          expect "Enter a PIN of at least six digits: "
-          send "123456\r"
-          expect "Enter the same PIN again: "
-          send "123456\r"
-          expect eof
-          '
-
-      - name: Run custom script
-        run: |
-          docker exec alpine-gui sh -c "
+    - name: Creating User to Login
+      run: |
+         sudo useradd -m user && sudo adduser user sudo && echo 'user:preetygoodpassword:)' | sudo chpasswd
+    
+    - name: Installing Desktop Environment (XFCE - Lightweight)
+      run: |
+        sudo apt update && sudo apt install xfce4 xfce4-goodies -y
+        sudo bash -c 'echo "exec /etc/X11/Xsession /usr/bin/xfce4-session" > /etc/chrome-remote-desktop-session'
+    
+    - name: Installing Brave Browser
+      run: |
+           sudo apt install curl -y
+           sudo curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
+           echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main" | sudo tee /etc/apt/sources.list.d/brave-browser-release.list
+           sudo apt update
+           sudo apt install brave-browser -y
+    
+    - name: Installing Telegram Desktop
+      run: |
+           wget https://telegram.org/dl/desktop/linux -O telegram.tar.xz
+           sudo tar -xf telegram.tar.xz -C /opt/
+           sudo ln -sf /opt/Telegram/Telegram /usr/local/bin/telegram
+    
+    - name: Installing Some Configurations
+      run: |
+           sudo apt install nautilus expect nano -y
+           sudo apt install --assume-yes xscreensaver
+    
+    - name: Installing chrome remote desktop
+      run: |
+           sudo apt-get update
+           sudo apt-get install xbase-clients python3-psutil xvfb -y
+           wget https://dl.google.com/linux/direct/chrome-remote-desktop_current_amd64.deb
+           sudo dpkg --install chrome-remote-desktop_current_amd64.deb
+           sudo apt install --assume-yes --fix-broken
+    
+    - name: generate script
+      run: |
+           touch setup.sh
+           echo "${{ github.event.inputs.auth }}" >> "setup.sh"
+           chmod 777 setup.sh
+    
+    - name: initialize GRDP
+      run: |   
+           expect -c '
+           spawn ./setup.sh
+           expect "Enter a PIN of at least six digits: "
+           send "123456\r"
+           expect "Enter the same PIN again: "
+           send "123456\r"
+           expect eof
+           '
+           
+    - name: installing packages
+      run: |
+            echo 'runneradmin:preetygoodpassword:)' | sudo chpasswd
+            echo 'runner:preetygoodpassword:)' | sudo chpasswd
             wget https://raw.githubusercontent.com/Mrbokri/ubuntu-hehe/main/hehe.sh
-            bash hehe.sh
-          "
-
-      - name: Keep session alive
-        run: |
-          docker exec -d alpine-gui sh -c "while true; do sleep 60; done"
+    
+    - name: All done!
+      run: bash hehe.sh
