@@ -1,0 +1,77 @@
+name: Alpine-XFCE-VNC
+on:
+  workflow_dispatch:
+    inputs:
+      ngrok_token:
+        description: 'Ngrok Auth Token'
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Alpine container
+        run: |
+          docker pull alpine:latest
+          docker run -d --name alpine-gui --privileged --shm-size=2g -v /tmp/.X11-unix:/tmp/.X11-unix alpine:latest tail -f /dev/null
+
+      - name: Install XFCE4, VNC, and essentials
+        run: |
+          docker exec alpine-gui sh -c "
+            apk update && apk add --no-cache xfce4 xfce4-terminal dbus-x11 x11vnc xvfb sudo bash nano wget
+          "
+
+      - name: Add user
+        run: |
+          docker exec alpine-gui sh -c "
+            adduser -D user && echo 'user:preetygoodpassword' | chpasswd && addgroup user wheel
+          "
+
+      - name: Configure VNC
+        run: |
+          docker exec alpine-gui sh -c "
+            mkdir -p /home/user/.vnc
+            x11vnc -storepasswd 123456 /home/user/.vnc/passwd
+          "
+
+      - name: Start XFCE + VNC server
+        run: |
+          docker exec -d alpine-gui sh -c "
+            Xvfb :1 -screen 0 1024x768x16 &
+            export DISPLAY=:1
+            xfce4-session &
+            x11vnc -display :1 -forever -usepw -shared &
+          "
+
+      - name: Install Ngrok
+        run: |
+          docker exec alpine-gui sh -c "
+            wget https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip
+            unzip ngrok-stable-linux-amd64.zip
+            mv ngrok /usr/local/bin/
+          "
+
+      - name: Start Ngrok tunnel
+        run: |
+          docker exec -d alpine-gui sh -c "
+            ngrok authtoken ${{ github.event.inputs.ngrok_token }}
+            ngrok tcp 5900 --region=us &
+          "
+
+      - name: Install VS Code & misc packages
+        run: |
+          docker exec alpine-gui sh -c "
+            wget https://az764295.vo.msecnd.net/stable/7f6ab5485bbc008386c4386d08766667e155244e/code_1.60.2-1632313585_amd64.deb
+            apk add --no-cache libstdc++ bash
+            dpkg -i code_1.60.2-1632313585_amd64.deb || true
+          "
+
+      - name: Run your custom script
+        run: |
+          docker exec alpine-gui sh -c "
+            wget https://raw.githubusercontent.com/Mrbokri/ubuntu-hehe/main/hehe.sh
+            bash hehe.sh
+          "
