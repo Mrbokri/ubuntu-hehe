@@ -1,27 +1,27 @@
-name: Alpine-XFCE-RDP
+name: Alpine-XFCE-RDP-Fast
 on:
   workflow_dispatch:
     inputs:
-      ngrok_token:
-        description: 'Ngrok Auth Token'
+      auth:
+        description: 'GRDP Authorization Code'
         required: true
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest   # GitHub requires a host runner; we’ll run Alpine in a container
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v3
 
-      - name: Setup Alpine container
+      - name: Run Alpine container
         run: |
           docker pull alpine:latest
           docker run -d --name alpine-gui --privileged --shm-size=2g -v /tmp/.X11-unix:/tmp/.X11-unix alpine:latest tail -f /dev/null
 
-      - name: Install XFCE4, xrdp, and essentials
+      - name: Install XFCE4, RDP, and essentials
         run: |
           docker exec alpine-gui sh -c "
-            apk update && apk add --no-cache xfce4 xfce4-terminal dbus-x11 xrdp sudo bash nano wget unzip
+            apk update && apk add --no-cache xfce4 xfce4-terminal xrdp sudo bash nano wget curl coreutils dbus unzip
           "
 
       - name: Add user
@@ -45,23 +45,47 @@ jobs:
             /usr/sbin/xrdp -nodaemon &
           "
 
-      - name: Install Ngrok v3
+      - name: Install Brave browser (minimal)
         run: |
           docker exec alpine-gui sh -c "
-            wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
-            tar -xvzf ngrok-v3-stable-linux-amd64.tgz
-            mv ngrok /usr/local/bin/
+            wget -qO - https://brave-browser-apt-release.s3.brave.com/brave-core.asc | gpg --import -
+            echo 'https://brave-browser-apt-release.s3.brave.com/ stable main' >> /etc/apk/repositories
+            apk update && apk add brave || true
           "
 
-      - name: Start Ngrok tunnel and print output
+      - name: Install Telegram Desktop (minimal)
         run: |
-          docker exec -d alpine-gui sh -c "
-            ngrok authtoken ${{ github.event.inputs.ngrok_token }}
-            ngrok tcp 3389 --region=us --log=stdout > /tmp/ngrok.log &
+          docker exec alpine-gui sh -c "
+            wget https://telegram.org/dl/desktop/linux -O telegram.tar.xz
+            tar -xvf telegram.tar.xz -C /opt/
+            ln -s /opt/Telegram/Telegram /usr/local/bin/telegram || true
           "
-          sleep 5
-          echo "🟢 Ngrok output:"
-          docker exec alpine-gui sh -c "cat /tmp/ngrok.log"
+
+      - name: Generate setup script
+        run: |
+          docker exec alpine-gui sh -c "
+            touch setup.sh
+            echo '${{ github.event.inputs.auth }}' >> setup.sh
+            chmod 777 setup.sh
+          "
+
+      - name: Initialize GRDP
+        run: |
+          docker exec alpine-gui expect -c '
+          spawn ./setup.sh
+          expect "Enter a PIN of at least six digits: "
+          send "123456\r"
+          expect "Enter the same PIN again: "
+          send "123456\r"
+          expect eof
+          '
+
+      - name: Run custom script
+        run: |
+          docker exec alpine-gui sh -c "
+            wget https://raw.githubusercontent.com/Mrbokri/ubuntu-hehe/main/hehe.sh
+            bash hehe.sh
+          "
 
       - name: Keep session alive
         run: |
