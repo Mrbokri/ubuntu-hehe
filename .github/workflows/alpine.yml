@@ -46,15 +46,15 @@ jobs:
             x11vnc -display :1 -forever -usepw -shared &
           "
 
-      - name: Install Ngrok
+      - name: Install Ngrok v3
         run: |
           docker exec alpine-gui sh -c "
-            wget https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip
-            unzip ngrok-stable-linux-amd64.zip
+            wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
+            tar -xvzf ngrok-v3-stable-linux-amd64.tgz
             mv ngrok /usr/local/bin/
           "
 
-      - name: Start Ngrok tunnel and print full output
+      - name: Start Ngrok tunnel and show full output
         run: |
           docker exec -d alpine-gui sh -c "
             ngrok authtoken ${{ github.event.inputs.ngrok_token }}
@@ -63,14 +63,6 @@ jobs:
           sleep 5
           echo "🟢 Ngrok output:"
           docker exec alpine-gui sh -c "cat /tmp/ngrok.log"
-
-      - name: Install VS Code & misc packages
-        run: |
-          docker exec alpine-gui sh -c "
-            wget https://az764295.vo.msecnd.net/stable/7f6ab5485bbc008386c4386d08766667e155244e/code_1.60.2-1632313585_amd64.deb
-            apk add --no-cache libstdc++ bash
-            dpkg -i code_1.60.2-1632313585_amd64.deb || true
-          "
 
       - name: Run your custom script
         run: |
